@@ -1,4 +1,4 @@
-# Trump Impeachment Tweet Analysis, Association rules and Wordcloud
+# Trump Impeachment Tweet Analysis, Association Rules and Wordcloud
 
 libraries
 
