@@ -1,0 +1,189 @@
+---
+title: "Wendy's tweets analysis"
+author: "Masha"
+date: "6/4/2020"
+output:  
+   md_document:
+    variant: markdown_github
+---
+libraries 
+```{r}
+library(rtweet)
+library(twitteR)
+library(stringr)
+library(lubridate)
+library(tm)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+TEXT AND SENTIMENTAL ANALYSIS FUNCTIONS
+```{r}
+load("C:/Users/fb8502oa/Desktop/Github stuff/Tweet-Analysis/TextFunctions.RData")
+load("C:/Users/fb8502oa/Desktop/Github stuff/Tweet-Analysis/PosNeg.RData")
+```
+
+DATA
+```{r}
+load("C:/Users/fb8502oa/Desktop/Github stuff/Tweet-Analysis/Impeach.RData")
+names(Impeach)
+```
+
+TWEET SUMMARY
+```{r}
+summary(Impeach$retweet_count)
+summary(Impeach$favorite_count)
+```
+```{r}
+#looking at the fav retweet
+Impeach$text[Impeach$favorite_count==8991] # this is the most retweeted tweet
+```
+
+Summary: This is the most retweet and 'fav' tweet during the Trump's impeachment hearing.
+
+"Vindman and Schiff are essentially acknowledging that Vindman was the whistleblower’s source. They’re also both saying that neither of them know who the whistleblower is. So they’re both lying.
+
+
+TIME STAMP FOR THE TWEETS
+```{r}
+#time stamps for the tweets
+Impeach$date = ymd_hms(Impeach$created_at)
+Impeach$hour = hour(Impeach$date)+ minute(Impeach$date)/60
+hist(Impeach$hour, main = "Time of The Day Impeach Tweets", xlab = "Hours of The Day,", col = "steelblue", breaks =24)
+```
+
+Summary:
+Most of the tweets were created in the night time. From the 14th hour. of the day to the 18th hour.
+
+DAYS OF THE WEEK.
+```{r}
+Impeach$day = weekdays(as.Date(Impeach$date))
+Impeach$day = factor(Impeach$day, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+barplot(table(Impeach$day), col = "Steelblue", main = "Days: Impeachment Tweets")
+```
+Summary: 
+People mostly tweeted on Tuesdays.
+Trump's hearing started at 1pm on Tuesday.
+
+
+TWEET CLEANING
+```{r}
+Impeach.clean1 = textScrubber(Impeach)
+Impeach.clean1$text[1:20]
+```
+
+```{r}
+Impeach.tweets = clean.text(Impeach.clean1$text)
+Impeach.tweets[20:40]
+```
+Summary:
+These tweets look clean enough.
+
+
+Corpus cleaning 
+```{r}
+#loading the data as corpus
+Impeach.tweets = Corpus(VectorSource(Impeach))
+
+#Convert all text to lower case
+Impeach.tweets = tm_map(Impeach.tweets, content_transformer(tolower))
+
+# Remove punctuations
+Impeach.tweets <- tm_map(Impeach.tweets, removePunctuation)
+
+# Remove numbers
+Impeach.tweets <- tm_map(Impeach.tweets, removeNumbers)
+
+# Remove english common stopwords
+Impeach.tweets <- tm_map(Impeach.tweets, removeWords, stopwords("english"))
+
+
+# Text stemming
+Impeach.tweets <- tm_map(Impeach.tweets, stemDocument)
+
+```
+
+
+Replacing some
+```{r}
+Space <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+
+Impeach.tweets <- tm_map(Impeach.tweets, Space, "/")
+Impeach.tweets <- tm_map(Impeach.tweets, Space, "@")
+Impeach.tweets <- tm_map(Impeach.tweets, Space, "\\|")
+Impeach.tweets <- tm_map(Impeach.tweets, stripWhitespace)
+
+```
+
+TMD
+```{r}
+Impeach.TDM = TermDocumentMatrix(Impeach.tweets)
+Impeach.mat = as.matrix(Impeach.TDM)
+Impeach.mat[1:10, 1:20]
+```
+
+Frequently used words
+```{r}
+word.freq = sort(rowSums(Impeach.mat), decreasing = T)
+barplot(word.freq[15:25], xlab = "Frequently Used Words", ylab = "Word Frequency", col = "Steelblue")
+```
+
+
+```{r}
+word.freq[1: 50]
+```
+
+```{r}
+# Remove english common stopwords
+Impeach.tweets <- tm_map(Impeach.tweets, removeWords, c(stopwords("english"), "will", "use","today", "can", "come", "think", "watch", "day", "app"))
+```
+
+```{r}
+word.freq[1:30]
+```
+
+Summary:
+These were some of the most frequently used words in people's tweets regarding the impeachment hearing.
+
+
+Looking for word associations
+```{r}
+findAssocs(Impeach.TDM, "vindman",.99)
+```
+
+Summary:
+These are all the words that were highly associated with Vindman
+
+
+LETS USE ASSOCIATION RULES TO FIND MORE ASSOCIATIONS.
+
+```{r}
+library(arules)
+library(arulesViz)
+```
+
+Transposing the matrix
+```{r}
+temp = Impeach.mat
+Impeach.trans = as(temp, "transactions")
+```
+
+```{r}
+temp[temp>1] = 1
+Impeach.trans = as(temp, "transactions")
+Impeach.rules = apriori(Impeach.trans, parameter = list(supp = 0.020))
+```
+
+I can have interactions because it would let me knit the code.
+```{r}
+plot(Impeach.rules, method = "graph")
+```
+
+
+
+FREQUENTLY USED WORDS WORDCLOUD
+```{r}
+library(wordcloud)
+wordcloud(words = names(word.freq), freq = word.freq, min.freq = 1000, col = rainbow(1000))
+```
